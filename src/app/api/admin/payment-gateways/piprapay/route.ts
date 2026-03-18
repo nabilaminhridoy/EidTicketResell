@@ -12,7 +12,23 @@ export async function GET() {
     })
 
     if (!gateway) {
-      return NextResponse.json({ gateway: null })
+      return NextResponse.json({ 
+        gateway: {
+          isEnabled: false,
+          isSandbox: true,
+          label: 'PipraPay',
+          description: 'Pay using multiple payment methods via PipraPay',
+          credentials: {
+            apiKey: '',
+            baseUrl: '',
+            redirectUrl: '',
+            cancelUrl: '',
+            webhookUrl: '',
+            currency: 'BDT',
+            returnType: 'POST',
+          },
+        }
+      })
     }
 
     // Parse credentials
@@ -31,14 +47,16 @@ export async function GET() {
         name: gateway.name,
         isEnabled: gateway.isEnabled,
         isSandbox: gateway.isSandbox,
+        label: (credentials as any).label || 'PipraPay',
+        description: (credentials as any).description || 'Pay using multiple payment methods via PipraPay',
         credentials: {
-          apiKey: credentials.apiKey || '',
-          baseUrl: credentials.baseUrl || '',
-          redirectUrl: credentials.redirectUrl || '',
-          cancelUrl: credentials.cancelUrl || '',
-          webhookUrl: credentials.webhookUrl || '',
-          currency: credentials.currency || 'BDT',
-          returnType: credentials.returnType || 'POST',
+          apiKey: (credentials as any).apiKey || '',
+          baseUrl: (credentials as any).baseUrl || '',
+          redirectUrl: (credentials as any).redirectUrl || '',
+          cancelUrl: (credentials as any).cancelUrl || '',
+          webhookUrl: (credentials as any).webhookUrl || '',
+          currency: (credentials as any).currency || 'BDT',
+          returnType: (credentials as any).returnType || 'POST',
         },
       }
     })
@@ -52,21 +70,27 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
-    const { isEnabled, isSandbox, credentials } = data
+    const { isEnabled, isSandbox, label, description, credentials } = data
 
-    // Save to PaymentGateway table
+    // Save to PaymentGateway table with label and description in credentials JSON
+    const credentialsWithMeta = {
+      ...credentials,
+      label: label || 'PipraPay',
+      description: description || 'Pay using multiple payment methods via PipraPay',
+    }
+
     const gateway = await db.paymentGateway.upsert({
       where: { name: 'piprapay' },
       update: {
         isEnabled: isEnabled || false,
         isSandbox: isSandbox !== false,
-        credentials: JSON.stringify(credentials || {}),
+        credentials: JSON.stringify(credentialsWithMeta),
       },
       create: {
         name: 'piprapay',
         isEnabled: isEnabled || false,
         isSandbox: isSandbox !== false,
-        credentials: JSON.stringify(credentials || {}),
+        credentials: JSON.stringify(credentialsWithMeta),
       },
     })
 

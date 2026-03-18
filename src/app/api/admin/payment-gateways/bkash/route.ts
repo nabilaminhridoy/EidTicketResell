@@ -32,7 +32,14 @@ export async function GET() {
           name: 'bkash',
           isEnabled: false,
           isSandbox: true,
-          credentials: {},
+          label: 'bKash',
+          description: 'Pay securely using bKash mobile wallet',
+          credentials: {
+            appKey: '',
+            appSecret: '',
+            username: '',
+            password: '',
+          },
         }
       })
     }
@@ -42,14 +49,23 @@ export async function GET() {
       SELECT credentials FROM PaymentGateway WHERE name = 'bkash'
     `
     
-    const credentials = Array.isArray(fullGateway) && fullGateway.length > 0 
+    const credentialsRaw = Array.isArray(fullGateway) && fullGateway.length > 0 
       ? (fullGateway[0] as any).credentials || '{}' 
       : '{}'
+
+    const parsedCredentials = typeof credentialsRaw === 'string' ? JSON.parse(credentialsRaw) : credentialsRaw
 
     return NextResponse.json({
       gateway: {
         ...gatewayData,
-        credentials: typeof credentials === 'string' ? JSON.parse(credentials) : credentials,
+        label: parsedCredentials.label || 'bKash',
+        description: parsedCredentials.description || 'Pay securely using bKash mobile wallet',
+        credentials: {
+          appKey: parsedCredentials.appKey || '',
+          appSecret: parsedCredentials.appSecret || '',
+          username: parsedCredentials.username || '',
+          password: parsedCredentials.password || '',
+        },
       }
     })
   } catch (error) {
@@ -65,7 +81,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
-    const { isEnabled, isSandbox, credentials } = data
+    const { isEnabled, isSandbox, label, description, credentials } = data
 
     // Validate required credentials when enabling
     if (isEnabled) {
@@ -77,7 +93,11 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString()
-    const credentialsJson = JSON.stringify(credentials || {})
+    const credentialsJson = JSON.stringify({
+      ...credentials,
+      label: label || 'bKash',
+      description: description || 'Pay securely using bKash mobile wallet',
+    })
 
     // Check if gateway exists
     const existing = await db.$queryRaw`

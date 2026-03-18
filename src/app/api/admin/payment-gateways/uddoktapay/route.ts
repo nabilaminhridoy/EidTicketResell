@@ -12,7 +12,22 @@ export async function GET() {
     })
 
     if (!gateway) {
-      return NextResponse.json({ gateway: null })
+      return NextResponse.json({ 
+        gateway: {
+          isEnabled: false,
+          isSandbox: true,
+          label: 'UddoktaPay',
+          description: 'Pay using multiple payment methods via UddoktaPay',
+          credentials: {
+            apiKey: '',
+            baseUrl: '',
+            apiType: 'checkout-v2',
+            redirectUrl: '',
+            cancelUrl: '',
+            webhookUrl: '',
+          },
+        }
+      })
     }
 
     // Parse credentials
@@ -31,13 +46,15 @@ export async function GET() {
         name: gateway.name,
         isEnabled: gateway.isEnabled,
         isSandbox: gateway.isSandbox,
+        label: (credentials as any).label || 'UddoktaPay',
+        description: (credentials as any).description || 'Pay using multiple payment methods via UddoktaPay',
         credentials: {
-          apiKey: credentials.apiKey || '',
-          baseUrl: credentials.baseUrl || '',
-          apiType: credentials.apiType || 'checkout-v2',
-          redirectUrl: credentials.redirectUrl || '',
-          cancelUrl: credentials.cancelUrl || '',
-          webhookUrl: credentials.webhookUrl || '',
+          apiKey: (credentials as any).apiKey || '',
+          baseUrl: (credentials as any).baseUrl || '',
+          apiType: (credentials as any).apiType || 'checkout-v2',
+          redirectUrl: (credentials as any).redirectUrl || '',
+          cancelUrl: (credentials as any).cancelUrl || '',
+          webhookUrl: (credentials as any).webhookUrl || '',
         },
       }
     })
@@ -51,21 +68,27 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
-    const { isEnabled, isSandbox, credentials } = data
+    const { isEnabled, isSandbox, label, description, credentials } = data
 
-    // Save to PaymentGateway table
+    // Save to PaymentGateway table with label and description in credentials JSON
+    const credentialsWithMeta = {
+      ...credentials,
+      label: label || 'UddoktaPay',
+      description: description || 'Pay using multiple payment methods via UddoktaPay',
+    }
+
     const gateway = await db.paymentGateway.upsert({
       where: { name: 'uddoktapay' },
       update: {
         isEnabled: isEnabled || false,
         isSandbox: isSandbox !== false,
-        credentials: JSON.stringify(credentials || {}),
+        credentials: JSON.stringify(credentialsWithMeta),
       },
       create: {
         name: 'uddoktapay',
         isEnabled: isEnabled || false,
         isSandbox: isSandbox !== false,
-        credentials: JSON.stringify(credentials || {}),
+        credentials: JSON.stringify(credentialsWithMeta),
       },
     })
 

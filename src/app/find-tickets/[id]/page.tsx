@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, use } from 'react'
+import { useState, use, useEffect } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
   MapPin, Calendar, Clock, Shield, Star, Eye, EyeOff, CreditCard,
   Bus, Train, Ship, Plane, User, Phone, Mail, Home, CheckCircle2,
-  AlertCircle, Wallet, Truck, Users, ArrowLeft, Lock
+  AlertCircle, Wallet, Truck, Users, ArrowLeft, Lock, Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -69,14 +69,27 @@ const mockTicket = {
   },
 }
 
-const paymentMethods = [
-  { value: 'BKASH', label: 'bKash', icon: '📱', color: 'bg-pink-500' },
-  { value: 'NAGAD', label: 'Nagad', icon: '💳', color: 'bg-orange-500' },
-  { value: 'UDDOKTAPAY', label: 'UddoktaPay', icon: '💼', color: 'bg-blue-500' },
-  { value: 'PIPRAPAY', label: 'PipraPay', icon: '💎', color: 'bg-purple-500' },
-  { value: 'CASH', label: 'Cash', icon: '💵', color: 'bg-green-500' },
-  { value: 'COD', label: 'Cash on Delivery', icon: '📦', color: 'bg-amber-500' },
+// Payment method icons and colors mapping
+const paymentMethodConfig: Record<string, { icon: string; color: string }> = {
+  bkash: { icon: '📱', color: 'bg-pink-500' },
+  nagad: { icon: '💳', color: 'bg-orange-500' },
+  uddoktapay: { icon: '💼', color: 'bg-blue-500' },
+  piprapay: { icon: '💎', color: 'bg-purple-500' },
+}
+
+// Static payment methods (always available)
+const staticPaymentMethods = [
+  { value: 'CASH', label: 'Cash', description: 'Pay with cash', icon: '💵', color: 'bg-green-500' },
+  { value: 'COD', label: 'Cash on Delivery', description: 'Pay when you receive', icon: '📦', color: 'bg-amber-500' },
 ]
+
+interface PaymentMethod {
+  id: string
+  name: string
+  label: string
+  description: string
+  isEnabled: boolean
+}
 
 const deliveryTypes = [
   {
@@ -129,6 +142,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const [showImage, setShowImage] = useState(false)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ value: string; label: string; description: string; icon: string; color: string }>>([])
+  const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(true)
   
   const [form, setForm] = useState<PurchaseForm>({
     buyerInfo: {
@@ -144,6 +159,33 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Load payment methods from API
+  useEffect(() => {
+    const loadPaymentMethods = async () => {
+      try {
+        const response = await fetch('/api/payment-methods')
+        if (response.ok) {
+          const data = await response.json()
+          const dynamicMethods = data.paymentMethods.map((method: PaymentMethod) => ({
+            value: method.name.toUpperCase(),
+            label: method.label,
+            description: method.description,
+            icon: paymentMethodConfig[method.name]?.icon || '💳',
+            color: paymentMethodConfig[method.name]?.color || 'bg-gray-500',
+          }))
+          setPaymentMethods([...dynamicMethods, ...staticPaymentMethods])
+        }
+      } catch (error) {
+        console.error('Error loading payment methods:', error)
+        // Fallback to static methods only
+        setPaymentMethods(staticPaymentMethods)
+      } finally {
+        setIsLoadingPaymentMethods(false)
+      }
+    }
+    loadPaymentMethods()
+  }, [])
 
   // Calculate platform fee (1% min 10 BDT)
   const platformFee = Math.max(Math.round(mockTicket.sellingPrice * 0.01), 10)
@@ -631,29 +673,47 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {paymentMethods.map((method) => {
-                      const isSelected = form.paymentMethod === method.value
-                      return (
-                        <button
-                          key={method.value}
-                          onClick={() => handleInputChange('paymentMethod', method.value)}
-                          className={cn(
-                            'flex items-center gap-3 p-3 rounded-xl border-2 transition-all',
-                            isSelected
-                              ? 'border-primary bg-primary/5'
-                              : 'border-border hover:border-primary/50'
-                          )}
-                        >
-                          <span className="text-2xl">{method.icon}</span>
-                          <span className="font-medium text-sm">{method.label}</span>
-                          {isSelected && (
-                            <CheckCircle2 className="w-5 h-5 text-primary ml-auto" />
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  {isLoadingPaymentMethods ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-muted-foreground">Loading payment methods...</span>
+                    </div>
+                  ) : paymentMethods.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No payment methods available
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {paymentMethods.map((method) => {
+                        const isSelected = form.paymentMethod === method.value
+                        return (
+                          <button
+                            key={method.value}
+                            onClick={() => handleInputChange('paymentMethod', method.value)}
+                            className={cn(
+                              'flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left',
+                              isSelected
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-primary/50'
+                            )}
+                          >
+                            <span className="text-2xl flex-shrink-0">{method.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium text-sm">{method.label}</span>
+                              {method.description && (
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                                  {method.description}
+                                </p>
+                              )}
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                   {errors['paymentMethod'] && (
                     <p className="text-xs text-destructive mt-2">{errors['paymentMethod']}</p>
                   )}

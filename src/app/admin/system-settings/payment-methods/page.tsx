@@ -26,6 +26,8 @@ import {
 interface BkashConfig {
   isEnabled: boolean
   isSandbox: boolean
+  label: string
+  description: string
   credentials: {
     appKey: string
     appSecret: string
@@ -37,6 +39,8 @@ interface BkashConfig {
 interface UddoktaPayConfig {
   isEnabled: boolean
   isSandbox: boolean
+  label: string
+  description: string
   apiKey: string
   baseUrl: string
   apiType: string
@@ -56,6 +60,8 @@ export default function PaymentMethodsPage() {
   const [bkashForm, setBkashForm] = useState<BkashConfig>({
     isEnabled: false,
     isSandbox: true,
+    label: 'bKash',
+    description: 'Pay securely using bKash mobile wallet',
     credentials: {
       appKey: '',
       appSecret: '',
@@ -65,17 +71,22 @@ export default function PaymentMethodsPage() {
   })
 
   const [nagadForm, setNagadForm] = useState({
-    enabled: false,
-    sandbox: true,
+    isEnabled: false,
+    isSandbox: true,
+    label: 'Nagad',
+    description: 'Pay securely using Nagad mobile wallet',
     merchantId: '',
-    merchantNumber: '',
-    publicKey: '',
-    privateKey: '',
+    merchantPrivateKey: '',
+    merchantPublicKey: '',
+    nagadPublicKey: '',
+    apiVersion: 'v-0.2.0',
   })
 
   const [uddoktaPayForm, setUddoktaPayForm] = useState<UddoktaPayConfig>({
     isEnabled: false,
     isSandbox: true,
+    label: 'UddoktaPay',
+    description: 'Pay using multiple payment methods via UddoktaPay',
     apiKey: '',
     baseUrl: '',
     apiType: 'checkout-v2',
@@ -87,6 +98,8 @@ export default function PaymentMethodsPage() {
   const [pipraPayForm, setPipraPayForm] = useState({
     isEnabled: false,
     isSandbox: true,
+    label: 'PipraPay',
+    description: 'Pay using multiple payment methods via PipraPay',
     apiKey: '',
     baseUrl: '',
     redirectUrl: '',
@@ -119,6 +132,8 @@ export default function PaymentMethodsPage() {
           setBkashForm({
             isEnabled: data.gateway.isEnabled || false,
             isSandbox: data.gateway.isSandbox !== false,
+            label: data.gateway.label || 'bKash',
+            description: data.gateway.description || 'Pay securely using bKash mobile wallet',
             credentials: {
               appKey: data.gateway.credentials?.appKey || '',
               appSecret: data.gateway.credentials?.appSecret || '',
@@ -137,12 +152,54 @@ export default function PaymentMethodsPage() {
           setUddoktaPayForm({
             isEnabled: data.gateway.isEnabled || false,
             isSandbox: data.gateway.isSandbox !== false,
+            label: data.gateway.label || 'UddoktaPay',
+            description: data.gateway.description || 'Pay using multiple payment methods via UddoktaPay',
             apiKey: data.gateway.credentials?.apiKey || '',
             baseUrl: data.gateway.credentials?.baseUrl || '',
             apiType: data.gateway.credentials?.apiType || 'checkout-v2',
             redirectUrl: data.gateway.credentials?.redirectUrl || '',
             cancelUrl: data.gateway.credentials?.cancelUrl || '',
             webhookUrl: data.gateway.credentials?.webhookUrl || '',
+          })
+        }
+      }
+
+      // Load Nagad config
+      const nagadRes = await fetch('/api/admin/payment-gateways/nagad')
+      if (nagadRes.ok) {
+        const data = await nagadRes.json()
+        if (data.isEnabled !== undefined || data.credentials) {
+          setNagadForm({
+            isEnabled: data.isEnabled || false,
+            isSandbox: data.isSandbox !== false,
+            label: data.label || 'Nagad',
+            description: data.description || 'Pay securely using Nagad mobile wallet',
+            merchantId: data.credentials?.merchantId || '',
+            merchantPrivateKey: data.credentials?.merchantPrivateKey || '',
+            merchantPublicKey: data.credentials?.merchantPublicKey || '',
+            nagadPublicKey: data.credentials?.nagadPublicKey || '',
+            apiVersion: data.credentials?.apiVersion || 'v-0.2.0',
+          })
+        }
+      }
+
+      // Load PipraPay config
+      const pipraRes = await fetch('/api/admin/payment-gateways/piprapay')
+      if (pipraRes.ok) {
+        const data = await pipraRes.json()
+        if (data.gateway) {
+          setPipraPayForm({
+            isEnabled: data.gateway.isEnabled || false,
+            isSandbox: data.gateway.isSandbox !== false,
+            label: data.gateway.label || 'PipraPay',
+            description: data.gateway.description || 'Pay using multiple payment methods via PipraPay',
+            apiKey: data.gateway.credentials?.apiKey || '',
+            baseUrl: data.gateway.credentials?.baseUrl || '',
+            redirectUrl: data.gateway.credentials?.redirectUrl || '',
+            cancelUrl: data.gateway.credentials?.cancelUrl || '',
+            webhookUrl: data.gateway.credentials?.webhookUrl || '',
+            currency: data.gateway.credentials?.currency || 'BDT',
+            returnType: data.gateway.credentials?.returnType || 'POST',
           })
         }
       }
@@ -159,7 +216,13 @@ export default function PaymentMethodsPage() {
       const response = await fetch('/api/admin/payment-gateways/bkash', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bkashForm),
+        body: JSON.stringify({
+          isEnabled: bkashForm.isEnabled,
+          isSandbox: bkashForm.isSandbox,
+          label: bkashForm.label,
+          description: bkashForm.description,
+          credentials: bkashForm.credentials,
+        }),
       })
 
       const data = await response.json()
@@ -196,6 +259,8 @@ export default function PaymentMethodsPage() {
         body: JSON.stringify({
           isEnabled: uddoktaPayForm.isEnabled,
           isSandbox: uddoktaPayForm.isSandbox,
+          label: uddoktaPayForm.label,
+          description: uddoktaPayForm.description,
           credentials: {
             apiKey: uddoktaPayForm.apiKey,
             baseUrl: uddoktaPayForm.baseUrl,
@@ -274,6 +339,52 @@ export default function PaymentMethodsPage() {
     }
   }
 
+  const handleSaveNagad = async () => {
+    setIsSaving('nagad')
+    try {
+      const response = await fetch('/api/admin/payment-gateways/nagad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isEnabled: nagadForm.isEnabled,
+          isSandbox: nagadForm.isSandbox,
+          label: nagadForm.label,
+          description: nagadForm.description,
+          credentials: {
+            merchantId: nagadForm.merchantId,
+            merchantPrivateKey: nagadForm.merchantPrivateKey,
+            merchantPublicKey: nagadForm.merchantPublicKey,
+            nagadPublicKey: nagadForm.nagadPublicKey,
+            apiVersion: nagadForm.apiVersion,
+          },
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast({
+          title: 'Nagad Configuration Saved',
+          description: 'Your Nagad payment gateway settings have been saved successfully.',
+        })
+      } else {
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to save Nagad configuration',
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save Nagad configuration',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSaving(null)
+    }
+  }
+
   const toggleShowCredential = (field: string) => {
     setShowCredentials(prev => ({ ...prev, [field]: !prev[field] }))
   }
@@ -287,6 +398,8 @@ export default function PaymentMethodsPage() {
         body: JSON.stringify({
           isEnabled: pipraPayForm.isEnabled,
           isSandbox: pipraPayForm.isSandbox,
+          label: pipraPayForm.label,
+          description: pipraPayForm.description,
           credentials: {
             apiKey: pipraPayForm.apiKey,
             baseUrl: pipraPayForm.baseUrl,
@@ -388,7 +501,12 @@ export default function PaymentMethodsPage() {
               <Badge variant="default" className="ml-1 h-5 px-1.5 text-xs bg-green-600">Active</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="nagad">Nagad</TabsTrigger>
+          <TabsTrigger value="nagad" className="gap-2">
+            <span>Nagad</span>
+            {nagadForm.isEnabled && (
+              <Badge variant="default" className="ml-1 h-5 px-1.5 text-xs bg-green-600">Active</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="uddoktapay" className="gap-2">
             <span>UddoktaPay</span>
             {uddoktaPayForm.isEnabled && (
@@ -462,6 +580,39 @@ export default function PaymentMethodsPage() {
                     checked={uddoktaPayForm.isSandbox}
                     onCheckedChange={(checked) => setUddoktaPayForm({ ...uddoktaPayForm, isSandbox: checked })}
                   />
+                </div>
+
+                {/* Display Settings */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    Display Settings
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Customize how this payment method appears to customers on the checkout page.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="uddoktapay-label">Label</Label>
+                      <Input
+                        id="uddoktapay-label"
+                        value={uddoktaPayForm.label}
+                        onChange={(e) => setUddoktaPayForm({ ...uddoktaPayForm, label: e.target.value })}
+                        placeholder="e.g., UddoktaPay"
+                      />
+                      <p className="text-xs text-muted-foreground">The name shown to customers at checkout</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="uddoktapay-description">Description</Label>
+                      <Input
+                        id="uddoktapay-description"
+                        value={uddoktaPayForm.description}
+                        onChange={(e) => setUddoktaPayForm({ ...uddoktaPayForm, description: e.target.value })}
+                        placeholder="e.g., Pay using multiple payment methods"
+                      />
+                      <p className="text-xs text-muted-foreground">Brief description shown below the label</p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* API Configuration */}
@@ -853,6 +1004,39 @@ export default function PaymentMethodsPage() {
                 />
               </div>
 
+              {/* Display Settings */}
+              <div className="space-y-4">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  Display Settings
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Customize how this payment method appears to customers on the checkout page.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bkash-label">Label</Label>
+                    <Input
+                      id="bkash-label"
+                      value={bkashForm.label}
+                      onChange={(e) => setBkashForm({ ...bkashForm, label: e.target.value })}
+                      placeholder="e.g., bKash"
+                    />
+                    <p className="text-xs text-muted-foreground">The name shown to customers at checkout</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bkash-description">Description</Label>
+                    <Input
+                      id="bkash-description"
+                      value={bkashForm.description}
+                      onChange={(e) => setBkashForm({ ...bkashForm, description: e.target.value })}
+                      placeholder="e.g., Pay securely using bKash mobile wallet"
+                    />
+                    <p className="text-xs text-muted-foreground">Brief description shown below the label</p>
+                  </div>
+                </div>
+              </div>
+
               {/* Credentials */}
               <div className="space-y-4">
                 <h3 className="font-semibold">API Credentials</h3>
@@ -1001,50 +1185,306 @@ export default function PaymentMethodsPage() {
 
         {/* Nagad */}
         <TabsContent value="nagad">
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg">Nagad Payment Gateway</CardTitle>
-                  <CardDescription>Configure Nagad payment integration</CardDescription>
+          <div className="space-y-6">
+            {/* Main Configuration Card */}
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <CreditCard className="w-5 h-5" />
+                      Nagad Payment Gateway
+                    </CardTitle>
+                    <CardDescription>
+                      Configure Nagad Online Payment Gateway (API v3.3)
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={nagadForm.isEnabled}
+                        onCheckedChange={(checked) => setNagadForm({ ...nagadForm, isEnabled: checked })}
+                      />
+                      <span className="text-sm font-medium">{nagadForm.isEnabled ? 'Enabled' : 'Disabled'}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Status Badge */}
+                <div className="flex flex-wrap items-center gap-4 p-4 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : nagadForm.isEnabled ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-muted-foreground" />
+                    )}
+                    <span className="text-sm font-medium">
+                      {isLoading ? 'Loading...' : nagadForm.isEnabled ? 'Gateway Active' : 'Gateway Inactive'}
+                    </span>
+                  </div>
+                  <Badge variant={nagadForm.isSandbox ? 'secondary' : 'default'}>
+                    {nagadForm.isSandbox ? 'Sandbox Mode' : 'Production Mode'}
+                  </Badge>
+                </div>
+
+                {/* Mode Toggle */}
+                <div className="flex flex-wrap items-center justify-between p-4 border rounded-lg gap-4">
+                  <div>
+                    <Label className="font-semibold">Sandbox Mode</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Enable for testing. Disable for production payments.
+                    </p>
+                  </div>
                   <Switch
-                    checked={nagadForm.enabled}
-                    onCheckedChange={(checked) => setNagadForm({ ...nagadForm, enabled: checked })}
+                    checked={nagadForm.isSandbox}
+                    onCheckedChange={(checked) => setNagadForm({ ...nagadForm, isSandbox: checked })}
                   />
-                  <span className="text-sm">{nagadForm.enabled ? 'Enabled' : 'Disabled'}</span>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Switch checked={nagadForm.sandbox} onCheckedChange={(checked) => setNagadForm({ ...nagadForm, sandbox: checked })} />
-                <span className="text-sm">Sandbox Mode</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Merchant ID</Label>
-                  <Input type="password" placeholder="Enter Merchant ID" value={nagadForm.merchantId} onChange={(e) => setNagadForm({ ...nagadForm, merchantId: e.target.value })} />
+
+                {/* Display Settings */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    Display Settings
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Customize how this payment method appears to customers on the checkout page.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="nagad-label">Label</Label>
+                      <Input
+                        id="nagad-label"
+                        value={nagadForm.label}
+                        onChange={(e) => setNagadForm({ ...nagadForm, label: e.target.value })}
+                        placeholder="e.g., Nagad"
+                      />
+                      <p className="text-xs text-muted-foreground">The name shown to customers at checkout</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="nagad-description">Description</Label>
+                      <Input
+                        id="nagad-description"
+                        value={nagadForm.description}
+                        onChange={(e) => setNagadForm({ ...nagadForm, description: e.target.value })}
+                        placeholder="e.g., Pay securely using Nagad mobile wallet"
+                      />
+                      <p className="text-xs text-muted-foreground">Brief description shown below the label</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Merchant Number</Label>
-                  <Input placeholder="Enter Merchant Number" value={nagadForm.merchantNumber} onChange={(e) => setNagadForm({ ...nagadForm, merchantNumber: e.target.value })} />
+
+                {/* RSA Key Generation Info */}
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-3">
+                  <h4 className="font-semibold text-sm flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                    <Key className="w-4 h-4" />
+                    RSA Key Pair Setup
+                  </h4>
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    Generate RSA key pair for secure communication. You need to:
+                  </p>
+                  <ol className="text-xs text-blue-600 dark:text-blue-400 list-decimal list-inside space-y-1">
+                    <li>Generate RSA key pair using the button below</li>
+                    <li>Upload your Public Key to Nagad Portal</li>
+                    <li>Copy Nagad&apos;s Public Key from their portal</li>
+                    <li>Keep your Private Key secure (never share it)</li>
+                  </ol>
                 </div>
-                <div className="space-y-2">
-                  <Label>Public Key</Label>
-                  <Input type="password" placeholder="Enter Public Key" value={nagadForm.publicKey} onChange={(e) => setNagadForm({ ...nagadForm, publicKey: e.target.value })} />
+
+                {/* Credentials */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Key className="w-4 h-4" />
+                    API Credentials
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Merchant ID */}
+                    <div className="space-y-2">
+                      <Label htmlFor="nagad-merchantId">Merchant ID</Label>
+                      <Input
+                        id="nagad-merchantId"
+                        placeholder="e.g., 687450000031324"
+                        value={nagadForm.merchantId}
+                        onChange={(e) => setNagadForm({ ...nagadForm, merchantId: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">15-digit merchant ID from Nagad portal</p>
+                    </div>
+
+                    {/* API Version */}
+                    <div className="space-y-2">
+                      <Label htmlFor="nagad-apiVersion">API Version</Label>
+                      <Select
+                        value={nagadForm.apiVersion}
+                        onValueChange={(value) => setNagadForm({ ...nagadForm, apiVersion: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select API Version" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="v-0.2.0">v-0.2.0 (Basic)</SelectItem>
+                          <SelectItem value="v-3.0.1">v-3.0.1 (With Service Fee)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">v-3.0.1 supports sender fee</p>
+                    </div>
+                  </div>
+
+                  {/* Private Key */}
+                  <div className="space-y-2">
+                    <Label htmlFor="nagad-privateKey">Merchant Private Key</Label>
+                    <div className="relative">
+                      <textarea
+                        id="nagad-privateKey"
+                        className="w-full min-h-[100px] p-3 text-xs font-mono bg-background border rounded-lg resize-y"
+                        placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+                        value={nagadForm.merchantPrivateKey}
+                        onChange={(e) => setNagadForm({ ...nagadForm, merchantPrivateKey: e.target.value })}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Your RSA private key for signing requests. Keep this secure!</p>
+                  </div>
+
+                  {/* Public Key */}
+                  <div className="space-y-2">
+                    <Label htmlFor="nagad-publicKey">Merchant Public Key</Label>
+                    <div className="relative">
+                      <textarea
+                        id="nagad-publicKey"
+                        className="w-full min-h-[100px] p-3 text-xs font-mono bg-background border rounded-lg resize-y"
+                        placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"
+                        value={nagadForm.merchantPublicKey}
+                        onChange={(e) => setNagadForm({ ...nagadForm, merchantPublicKey: e.target.value })}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Your RSA public key (upload to Nagad portal)</p>
+                  </div>
+
+                  {/* Nagad Public Key */}
+                  <div className="space-y-2">
+                    <Label htmlFor="nagad-nagadPublicKey">Nagad Public Key</Label>
+                    <div className="relative">
+                      <textarea
+                        id="nagad-nagadPublicKey"
+                        className="w-full min-h-[100px] p-3 text-xs font-mono bg-background border rounded-lg resize-y"
+                        placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"
+                        value={nagadForm.nagadPublicKey}
+                        onChange={(e) => setNagadForm({ ...nagadForm, nagadPublicKey: e.target.value })}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Nagad&apos;s public key from their portal (for encrypting requests)</p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Private Key</Label>
-                  <Input type="password" placeholder="Enter Private Key" value={nagadForm.privateKey} onChange={(e) => setNagadForm({ ...nagadForm, privateKey: e.target.value })} />
+
+                {/* API Endpoints Reference */}
+                <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                    <BookOpen className="w-4 h-4" />
+                    API Endpoints Reference
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground">Sandbox URL:</span>
+                      <code className="block bg-background px-2 py-1 rounded text-xs">
+                        https://sandbox.mynagad.com:10080
+                      </code>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground">Initialize:</span>
+                      <code className="block bg-background px-2 py-1 rounded text-xs">
+                        POST /remote-payment-gateway-1.0/api/dfs/check-out/initialize
+                      </code>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground">Complete:</span>
+                      <code className="block bg-background px-2 py-1 rounded text-xs">
+                        POST /api/dfs/check-out/complete/{'{paymentRefId}'}
+                      </code>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground">Verify:</span>
+                      <code className="block bg-background px-2 py-1 rounded text-xs">
+                        GET /api/dfs/verify/payment/{'{paymentRefId}'}
+                      </code>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg">
-                Nagad integration coming soon. This is a placeholder for the configuration.
-              </p>
-            </CardContent>
-          </Card>
+
+                {/* Encryption Info */}
+                <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                  <h4 className="font-semibold text-sm">Encryption Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                    <div><span className="text-muted-foreground">Algorithm:</span> RSA PKCS1Padding</div>
+                    <div><span className="text-muted-foreground">Signature:</span> SHA1withRSA</div>
+                    <div><span className="text-muted-foreground">Encoding:</span> Base64</div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-wrap items-center gap-3 pt-4">
+                  <Button
+                    className="btn-primary"
+                    onClick={handleSaveNagad}
+                    disabled={isSaving === 'nagad'}
+                  >
+                    {isSaving === 'nagad' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Configuration'
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Integration Flow Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ArrowRightLeft className="w-4 h-4" />
+                  Payment Flow
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                    <Badge variant="outline" className="mt-0.5">1</Badge>
+                    <div>
+                      <p className="font-medium">Initialize Payment</p>
+                      <p className="text-xs text-muted-foreground">Call initialize API with orderId, get paymentReferenceId</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                    <Badge variant="outline" className="mt-0.5">2</Badge>
+                    <div>
+                      <p className="font-medium">Complete Order</p>
+                      <p className="text-xs text-muted-foreground">Send amount, get callBackUrl (Nagad payment page)</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                    <Badge variant="outline" className="mt-0.5">3</Badge>
+                    <div>
+                      <p className="font-medium">User Payment</p>
+                      <p className="text-xs text-muted-foreground">User enters mobile number → OTP → PIN</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                    <Badge variant="outline" className="mt-0.5">4</Badge>
+                    <div>
+                      <p className="font-medium">Callback</p>
+                      <p className="text-xs text-muted-foreground">Nagad redirects to callback URL with payment result</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* PipraPay */}
@@ -1106,6 +1546,39 @@ export default function PaymentMethodsPage() {
                     checked={pipraPayForm.isSandbox}
                     onCheckedChange={(checked) => setPipraPayForm({ ...pipraPayForm, isSandbox: checked })}
                   />
+                </div>
+
+                {/* Display Settings */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    Display Settings
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Customize how this payment method appears to customers on the checkout page.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="piprapay-label">Label</Label>
+                      <Input
+                        id="piprapay-label"
+                        value={pipraPayForm.label}
+                        onChange={(e) => setPipraPayForm({ ...pipraPayForm, label: e.target.value })}
+                        placeholder="e.g., PipraPay"
+                      />
+                      <p className="text-xs text-muted-foreground">The name shown to customers at checkout</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="piprapay-description">Description</Label>
+                      <Input
+                        id="piprapay-description"
+                        value={pipraPayForm.description}
+                        onChange={(e) => setPipraPayForm({ ...pipraPayForm, description: e.target.value })}
+                        placeholder="e.g., Pay using multiple payment methods"
+                      />
+                      <p className="text-xs text-muted-foreground">Brief description shown below the label</p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* API Configuration */}
