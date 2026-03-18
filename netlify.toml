@@ -5,6 +5,7 @@
 [build.environment]
   NODE_VERSION = "20"
   BUN_VERSION = "latest"
+  DATABASE_URL = "file:./prisma/dev.db"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
