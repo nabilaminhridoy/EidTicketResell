@@ -1,18 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { CheckCircle, Ticket, Home, Download, Loader2 } from 'lucide-react'
+import { CheckCircle, Ticket, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
 
   // Get transaction details from URL params
   const transactionId = searchParams.get('transaction_id')
@@ -155,5 +154,37 @@ export default function PaymentSuccessPage() {
         </motion.div>
       </motion.div>
     </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        <Card className="border-0 shadow-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-8 text-center">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm mb-4">
+              <CheckCircle className="w-12 h-12 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-white">Payment Successful!</h1>
+            <p className="text-green-100 mt-2">Loading...</p>
+          </div>
+          <CardContent className="p-6">
+            <div className="animate-pulse space-y-4">
+              <div className="h-4 bg-slate-200 rounded w-3/4 mx-auto"></div>
+              <div className="h-4 bg-slate-200 rounded w-1/2 mx-auto"></div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <PaymentSuccessContent />
+    </Suspense>
   )
 }

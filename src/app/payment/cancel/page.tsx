@@ -1,15 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { XCircle, Ticket, Home, RefreshCw, ArrowLeft } from 'lucide-react'
+import { XCircle, Ticket, Home, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 
-export default function PaymentCancelPage() {
+function PaymentCancelContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -193,5 +193,37 @@ export default function PaymentCancelPage() {
         </motion.div>
       </motion.div>
     </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        <Card className="border-0 shadow-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-red-500 to-orange-500 p-8 text-center">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm mb-4">
+              <XCircle className="w-12 h-12 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-white">Payment Cancelled</h1>
+            <p className="text-red-100 mt-2">Loading...</p>
+          </div>
+          <CardContent className="p-6">
+            <div className="animate-pulse space-y-4">
+              <div className="h-4 bg-slate-200 rounded w-3/4 mx-auto"></div>
+              <div className="h-4 bg-slate-200 rounded w-1/2 mx-auto"></div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+export default function PaymentCancelPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <PaymentCancelContent />
+    </Suspense>
   )
 }
