@@ -60,14 +60,6 @@ const DYNAMIC_ROUTE_PREFIXES = [
   '/find-tickets/', // /find-tickets/[id]
 ]
 
-// Routes that should always be accessible (even during maintenance)
-const MAINTENANCE_ALLOWED_ROUTES = [
-  '/maintenance-mode',
-  '/api',
-  '/_next',
-  '/admin',
-]
-
 // Static file extensions to allow
 const STATIC_EXTENSIONS = [
   '.png',
@@ -102,7 +94,7 @@ function isValidRoute(pathname: string): boolean {
   return false
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Always allow static files
