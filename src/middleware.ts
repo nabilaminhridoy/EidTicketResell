@@ -33,6 +33,7 @@ const VALID_ROUTES = [
   '/user/profile',
   // Admin routes
   '/admin/login',
+  '/admin/logout',
   '/admin',
   '/admin/profile',
   '/admin/tickets',
