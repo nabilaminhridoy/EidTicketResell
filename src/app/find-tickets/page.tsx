@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
+import { Suspense } from 'react'
 import { 
   Search, Filter, Bus, Train, Ship, Plane, ArrowRight, 
   Star, Shield, MapPin, Calendar, Clock, X, SlidersHorizontal
@@ -49,7 +50,7 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 }
 
-export default function FindTicketsPage() {
+function FindTicketsContent() {
   const searchParams = useSearchParams()
   const [tickets, setTickets] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -220,7 +221,6 @@ export default function FindTicketsPage() {
   )
 
   return (
-    <MainLayout>
     <div className="min-h-screen bg-muted/30 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
@@ -394,6 +394,28 @@ export default function FindTicketsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function FindTicketsFallback() {
+  return (
+    <div className="min-h-screen bg-muted/30 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <span className="ml-3 text-muted-foreground">Loading...</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function FindTicketsPage() {
+  return (
+    <MainLayout>
+      <Suspense fallback={<FindTicketsFallback />}>
+        <FindTicketsContent />
+      </Suspense>
     </MainLayout>
   )
 }
