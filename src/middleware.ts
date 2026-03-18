@@ -1,13 +1,70 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// All valid routes in the application
+const VALID_ROUTES = [
+  '/',
+  '/find-tickets',
+  '/sell-tickets',
+  '/how-it-works',
+  '/safety-guidelines',
+  '/about-us',
+  '/contact-us',
+  '/help',
+  '/faqs',
+  '/404',
+  '/maintenance-mode',
+  '/payment/success',
+  '/payment/cancel',
+  '/privacy-policy',
+  '/terms-of-service',
+  '/cookie-policy',
+  '/refund-policy',
+  // User routes
+  '/user/login',
+  '/user/register',
+  '/user/forgot-password',
+  '/user',
+  '/user/listings',
+  '/user/purchases',
+  '/user/wallet',
+  '/user/transaction-history',
+  '/user/id-verification',
+  '/user/profile',
+  // Admin routes
+  '/admin/login',
+  '/admin',
+  '/admin/profile',
+  '/admin/tickets',
+  '/admin/users',
+  '/admin/users/roles',
+  '/admin/users/users',
+  '/admin/transactions',
+  '/admin/purchases',
+  '/admin/payouts',
+  '/admin/reports',
+  '/admin/system-settings',
+  '/admin/system-settings/general-settings',
+  '/admin/system-settings/payment-methods',
+  '/admin/system-settings/mail-settings',
+  '/admin/system-settings/environment-settings',
+  '/admin/system-settings/login-settings',
+  '/admin/system-settings/logo-favicon',
+  '/admin/system-settings/seo-settings',
+  '/admin/system-settings/email-template',
+]
+
+// Routes that have dynamic segments (check by prefix)
+const DYNAMIC_ROUTE_PREFIXES = [
+  '/find-tickets/', // /find-tickets/[id]
+]
+
 // Routes that should always be accessible (even during maintenance)
-const ALLOWED_ROUTES = [
+const MAINTENANCE_ALLOWED_ROUTES = [
   '/maintenance-mode',
   '/api',
   '/_next',
-  '/favicon.png',
-  '/admin', // Admin panel should be accessible
+  '/admin',
 ]
 
 // Static file extensions to allow
@@ -24,7 +81,25 @@ const STATIC_EXTENSIONS = [
   '.eot',
   '.css',
   '.js',
+  '.json',
+  '.xml',
+  '.txt',
 ]
+
+// Check if route is valid
+function isValidRoute(pathname: string): boolean {
+  // Check exact match
+  if (VALID_ROUTES.includes(pathname)) {
+    return true
+  }
+
+  // Check dynamic routes
+  if (DYNAMIC_ROUTE_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
+    return true
+  }
+
+  return false
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -34,8 +109,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Always allow specific routes
-  if (ALLOWED_ROUTES.some(route => pathname.startsWith(route))) {
+  // Allow API routes and Next.js internal routes
+  if (pathname.startsWith('/api') || pathname.startsWith('/_next')) {
     return NextResponse.next()
   }
 
@@ -69,6 +144,12 @@ export async function middleware(request: NextRequest) {
   } catch (error) {
     // If we can't check maintenance mode, allow the request through
     console.error('Error checking maintenance mode:', error)
+  }
+
+  // Check if route is valid, if not redirect to 404
+  if (!isValidRoute(pathname)) {
+    const url404 = new URL('/404', request.url)
+    return NextResponse.rewrite(url404)
   }
 
   return NextResponse.next()
