@@ -1,0 +1,335 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum TicketStatus {
+  PENDING   // Waiting for admin approval
+  ACTIVE    // Available in marketplace
+  SOLD      // Purchased
+  CANCELLED // Cancelled by seller/admin
+}
+
+enum DeliveryType {
+  ONLINE      // Escrow system
+  IN_PERSON   // QR + Map
+  COURIER     // COD system
+}
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  phone           String   @unique
+  passwordHash    String
+  name            String
+  avatar          String?
+  role            Role     @default(USER)
+  isIdVerified    Boolean  @default(false)
+  availableBalance Float   @default(0.0)
+  pendingBalance  Float    @default(0.0)
+  lockedBalance   Float    @default(0.0)
+  otpCode         String?
+  otpExpiresAt    DateTime?
+  
+  ticketsSold     Ticket[] @relation("SellerTickets")
+  purchases       Transaction[] @relation("BuyerTransactions")
+  withdrawals     Withdrawal[] @relation("UserWithdrawals")
+  notifications   Notification[]
+  riskProfile     RiskProfile?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Ticket {
+  id              String   @id @default(uuid())
+  ticketId        String   @unique // TKT-XXXX format
+  transportType   String   // BUS, TRAIN, LAUNCH, AIR
+  ticketType      String   // ONLINE_COPY, COUNTER_COPY
+  company         String
+  
+  routeFrom       String
+  routeTo         String
+  travelDate      DateTime
+  departureTime   String
+  seatNumber      String
+  classType       String
+  
+  // Sleeper specifics
+  isSleeper       Boolean  @default(false)
+  deckOption      String?  // UPPER, LOWER
+  
+  boardingPoint   String
+  droppingPoint   String
+  
+  originalPrice   Float
+  sellingPrice    Float?
+  notes           String?  @db.Text
+  fileUrl         String   // Cloudinary URL required
+  
+  status          TicketStatus @default(PENDING)
+  
+  // Delivery config (Seller chosen options)
+  allowOnline     Boolean @default(true)
+  allowInPerson   Boolean @default(false)
+  allowCourier    Boolean @default(false)
+  meetupLocation  String? // JSON string for LatLng
+  courierFee      Float?
+  
+  // Relations
+  sellerId        String
+  seller          User     @relation("SellerTickets", fields: [sellerId], references: [id])
+  
+  transactions    Transaction[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([transportType])
+  @@index([routeFrom])
+  @@index([routeTo])
+  @@index([travelDate])
+  @@index([status])
+  @@index([sellingPrice])
+}
+
+model Transaction {
+  id              String   @id @default(uuid())
+  ticketId        String
+  ticket          Ticket   @relation(fields: [ticketId], references: [id])
+  
+  buyerId         String
+  buyer           User     @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  
+  amount          Float
+  commission      Float    // 1% platform fee
+  
+  deliveryType    DeliveryType
+  status          String   // PENDING, COMPLETED, FAILED, DISPUTED, REFUNDED
+  qrCode          String?  // For IN_PERSON
+  trackingUrl     String?  // For Courier
+  
+  dispute         Dispute? @relation("TransactionDispute")
+  refund          Refund?  @relation("TransactionRefund")
+  
+  paymentStatus   String?  // PENDING, PAID, FAILED
+  gateway         String?  // bkash, sslcommerz
+  gatewayTransactionId String?
+  paymentVerifiedAt DateTime?
+  
+  paymentLogs     PaymentLog[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// -------------------------------------------------------------
+// HYBRID CONFIGURATION & SYSTEM MODELS
+// -------------------------------------------------------------
+
+model SystemConfiguration {
+  id              String   @id @default(uuid())
+  key             String   @unique // e.g., 'general_settings', 'env_settings', 'seo_settings'
+  value           Json     // JSON block holding the flexible data
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PaymentGateway {
+  id              String   @id @default(uuid())
+  identifier      String   @unique // e.g., 'bkash', 'sslcommerz', 'uddoktapay'
+  name            String   // Display label
+  description     String?  @db.Text
+  status          Boolean  @default(false)
+  logo            String?
+  
+  minAmount       Float    @default(0)
+  maxAmount       Float    @default(0)
+  fixedDiscount   Float    @default(0)
+  percentDiscount Float    @default(0)
+  fixedCharge     Float    @default(0)
+  percentCharge   Float    @default(0)
+  
+  isSandbox       Boolean  @default(true)
+  config          Json     // Stores merchantId, storePassword, appKey etc based on gateway
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PaymentLog {
+  id              String   @id @default(uuid())
+  transactionId   String
+  transaction     Transaction @relation(fields: [transactionId], references: [id])
+  
+  gateway         String
+  rawPayload      Json
+  signature       String?
+  status          String   // SUCCESS, FAILED, INVALID_SIGNATURE
+  
+  createdAt       DateTime @default(now())
+}
+
+model EmailTemplate {
+  id              String   @id @default(uuid())
+  identifier      String   @unique // e.g., 'admin_new_ticket', 'user_welcome'
+  name            String
+  subject         String
+  body            String   @db.Text
+  status          Boolean  @default(true)
+  isForAdmin      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SmsTemplate {
+  id              String   @id @default(uuid())
+  identifier      String   @unique
+  name            String
+  message         String   @db.Text
+  status          Boolean  @default(true)
+  isForAdmin      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Withdrawal {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation("UserWithdrawals", fields: [userId], references: [id])
+  
+  amount          Float
+  method          String   // e.g. bKash, Nagad, Bank Transfer
+  accountDetails  Json     // Account number, routing number, etc.
+  
+  status          String   // PENDING, APPROVED, REJECTED, COMPLETED
+  adminNote       String?  @db.Text
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// -------------------------------------------------------------
+// SPRINT 1: SECURITY & AUTHENTICATION MODELS
+// -------------------------------------------------------------
+
+model VerificationToken {
+  id              String   @id @default(uuid())
+  identifier      String   // Email or Phone number
+  token           String   // The OTP or hashed OTP
+  type            String   // e.g. "EMAIL", "SMS", "PASSWORD_RESET"
+  expiresAt       DateTime
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([identifier, token])
+}
+
+model AuditLog {
+  id              String   @id @default(uuid())
+  userId          String?
+  action          String   // e.g. "LOGIN_FAILED", "WITHDRAWAL_APPROVED"
+  details         Json?    
+  ipAddress       String?
+  userAgent       String?
+  
+  createdAt       DateTime @default(now())
+}
+
+model SecurityEvent {
+  id              String   @id @default(uuid())
+  eventType       String   // e.g. "RATE_LIMIT_EXCEEDED", "ANOMALOUS_LOGIN", "DUPLICATE_TICKET_ATTEMPT"
+  severity        String   // "LOW", "MEDIUM", "HIGH", "CRITICAL"
+  userId          String?
+  ipAddress       String?
+  userAgent       String?
+  details         Json?
+  isResolved      Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+}
+
+// -------------------------------------------------------------
+// SPRINT 6: ESCROW & DISPUTES
+// -------------------------------------------------------------
+
+model Dispute {
+  id              String   @id @default(uuid())
+  transactionId   String   @unique
+  transaction     Transaction @relation("TransactionDispute", fields: [transactionId], references: [id])
+  
+  raisedById      String
+  raisedAgainstId String
+  reason          String   @db.Text
+  
+  status          String   @default("OPEN") // OPEN, UNDER_REVIEW, RESOLVED_BUYER, RESOLVED_SELLER
+  adminNote       String?  @db.Text
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Refund {
+  id              String   @id @default(uuid())
+  transactionId   String   @unique
+  transaction     Transaction @relation("TransactionRefund", fields: [transactionId], references: [id])
+  
+  userId          String   // The user receiving the funds back into their wallet
+  amount          Float
+  reason          String   @db.Text
+  
+  status          String   @default("PENDING") // PENDING, COMPLETED, FAILED
+  isGatewayDirect Boolean  @default(false)     // True if forcing Gateway API reversal edge case
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// -------------------------------------------------------------
+// SPRINT 7: IN-APP NOTIFICATIONS
+// -------------------------------------------------------------
+
+model Notification {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  
+  type            String   // e.g. "TICKET_SOLD", "DISPUTE_OPENED", "SYSTEM_ALERT"
+  title           String
+  message         String   @db.Text
+  link            String?  // Optional routing url for the frontend action
+  
+  isRead          Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+}
+
+// -------------------------------------------------------------
+// SPRINT 9: ADVANCED FRAUD DETECTION
+// -------------------------------------------------------------
+
+model RiskProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  
+  score           Int      @default(0) // 0-100 scale
+  isQuarantined   Boolean  @default(false)
+  
+  // Auditing variables for manual admin clearance
+  quarantineReason  String?  @db.Text
+  quarantineTime    DateTime?
+  lastTriggeredEvent String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
